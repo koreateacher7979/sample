@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>잔반량 관리 대시보드</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Pretendard', sans-serif; background-color: #f8fafc; }
+        .chart-container { position: relative; height: 300px; width: 100%; }
+        .glass-card { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); border-radius: 1rem; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <!-- Header Section -->
+    <header class="max-w-7xl mx-auto mb-8 flex flex-col md:flex-row justify-between items-center bg-indigo-600 text-white p-6 rounded-2xl shadow-lg">
+        <div>
+            <h1 class="text-2xl font-bold">🍱 잔반 제로(Zero) 실시간 대시보드</h1>
+            <p class="text-indigo-100 opacity-90 mt-1">학생별 잔반 배출 현황 및 통계 분석 시스템</p>
+        </div>
+        <div class="mt-4 md:mt-0 text-right">
+            <p class="text-sm font-semibold bg-white/20 px-4 py-2 rounded-full inline-block">
+                개발자: 가치있는 미래교육 연구소 대표 김병찬
+            </p>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto space-y-8">
+        <!-- Top Stats Row -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div class="glass-card p-6 border-l-4 border-indigo-500">
+                <p class="text-gray-500 text-sm">전체 학생 수</p>
+                <h3 class="text-3xl font-bold text-gray-800" id="totalStudents">0명</h3>
+            </div>
+            <div class="glass-card p-6 border-l-4 border-emerald-500">
+                <p class="text-gray-500 text-sm">누적 총 잔반량</p>
+                <h3 class="text-3xl font-bold text-gray-800" id="totalWaste">0g</h3>
+            </div>
+            <div class="glass-card p-6 border-l-4 border-amber-500">
+                <p class="text-gray-500 text-sm">월 평균 잔반량</p>
+                <h3 class="text-3xl font-bold text-gray-800" id="avgWaste">0g</h3>
+            </div>
+            <div class="glass-card p-6 border-l-4 border-rose-500">
+                <p class="text-gray-500 text-sm">노력 필요 학생</p>
+                <h3 class="text-3xl font-bold text-gray-800" id="needsWork">0명</h3>
+            </div>
+        </div>
+
+        <!-- Charts Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- 1. 월별 총 잔반양 추이 -->
+            <div class="glass-card p-6">
+                <h2 class="text-lg font-bold mb-4 flex items-center">
+                    <span class="w-2 h-6 bg-indigo-500 rounded mr-2"></span>월별 총 잔반량 추이
+                </h2>
+                <div class="chart-container">
+                    <canvas id="monthlyTrendChart"></canvas>
+                </div>
+            </div>
+
+            <!-- 2. 등급별 현황 분포 -->
+            <div class="glass-card p-6">
+                <h2 class="text-lg font-bold mb-4 flex items-center">
+                    <span class="w-2 h-6 bg-emerald-500 rounded mr-2"></span>학생 등급 분포 현황
+                </h2>
+                <div class="chart-container">
+                    <canvas id="gradeDistributionChart"></canvas>
+                </div>
+            </div>
+
+            <!-- 3. 학생별 누적 잔반량 TOP 10 -->
+            <div class="glass-card p-6 lg:col-span-2">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-lg font-bold flex items-center">
+                        <span class="w-2 h-6 bg-amber-500 rounded mr-2"></span>학생별 누적 잔반량 현황
+                    </h2>
+                    <select id="sortOrder" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2" onchange="updateIndividualChart()">
+                        <option value="desc">잔반 많은 순</option>
+                        <option value="asc">잔반 적은 순</option>
+                    </select>
+                </div>
+                <div class="chart-container" style="height: 400px;">
+                    <canvas id="individualWasteChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Table -->
+        <div class="glass-card p-6 overflow-x-auto">
+            <h2 class="text-lg font-bold mb-4 flex items-center">
+                <span class="w-2 h-6 bg-slate-500 rounded mr-2"></span>학생별 상세 데이터 목록
+            </h2>
+            <table class="w-full text-sm text-left text-gray-500">
+                <thead class="text-xs text-gray-700 uppercase bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3">이름</th>
+                        <th class="px-6 py-3">학급</th>
+                        <th class="px-6 py-3 text-center">3월</th>
+                        <th class="px-6 py-3 text-center">4월</th>
+                        <th class="px-6 py-3 text-center">5월</th>
+                        <th class="px-6 py-3 text-center">6월</th>
+                        <th class="px-6 py-3 text-center">누적 합계</th>
+                        <th class="px-6 py-3 text-center">등급</th>
+                    </tr>
+                </thead>
+                <tbody id="dataTableBody">
+                    <!-- Loaded via JavaScript -->
+                </tbody>
+            </table>
+        </div>
+    </main>
+
+    <footer class="max-w-7xl mx-auto mt-12 mb-8 text-center text-gray-400 text-sm">
+        &copy; 2024 가치있는 미래교육 연구소. All Rights Reserved.
+    </footer>
+
+    <script>
+        // 스프레드시트 데이터 (Gemini Tool을 통해 확보된 데이터를 기반으로 초기화)
+        // 실제 운영 시 '공유 -> 웹에 게시' 후 CSV 주소를 fetch 하도록 수정 가능합니다.
+        const rawData = [
+            ["김철수","1학년 3반",131,71,143,71,"보통"],
+            ["이영희","1학년 1반",32,197,47,71,"우수"],
+            ["박민준","1학년 5반",75,154,58,29,"우수"],
+            ["정서연","1학년 2반",68,188,24,71,"우수"],
+            ["최도윤","1학년 4반",51,122,116,87,"우수"],
+            ["강하윤","1학년 1반",102,45,56,36,"우수"],
+            ["조은우","1학년 3반",81,36,11,67,"매우우수"],
+            ["윤지민","1학년 5반",101,144,20,155,"보통"],
+            ["장현우","1학년 2반",159,12,87,147,"보통"],
+            ["임서윤","1학년 4반",177,57,175,200,"노력하기"],
+            ["한지호","1학년 1반",114,146,38,156,"보통"],
+            ["오지유","1학년 3반",194,198,187,128,"노력하기"],
+            ["서민지","1학년 5반",12,77,183,124,"우수"],
+            ["신주원","1학년 2반",148,166,32,72,"보통"],
+            ["권예준","1학년 4반",106,77,24,197,"보통"],
+            ["황수빈","1학년 1반",11,97,115,126,"우수"],
+            ["안태양","1학년 3반",25,109,128,35,"우수"],
+            ["송다은","1학년 5반",82,74,58,68,"우수"],
+            ["전준서","1학년 2반",113,161,131,111,"보통"],
+            ["홍채원","1학년 4반",21,125,33,125,"우수"],
+            ["유하준","1학년 1반",150,142,84,124,"보통"],
+            ["고은지","1학년 3반",193,156,96,144,"보통"],
+            ["문정우","1학년 5반",99,141,146,85,"보통"],
+            ["양세은","1학년 2반",168,173,81,13,"보통"],
+            ["손지훈","1학년 4반",145,37,10,176,"우수"],
+            ["배지아","1학년 1반",107,186,159,44,"보통"],
+            ["백시우","1학년 3반",155,51,139,158,"보통"],
+            ["허윤아","1학년 5반",148,122,12,84,"우수"],
+            ["남건우","1학년 2반",132,29,83,54,"우수"],
+            ["유소율","1학년 4반",90,58,119,58,"우수"],
+            ["박지후","1학년 1반",131,116,188,36,"보통"],
+            ["김민서","1학년 3반",32,127,198,102,"보통"],
+            ["이도현","1학년 5반",168,37,18,104,"우수"],
+            ["최서윤","1학년 2반",20,129,102,160,"보통"],
+            ["정주원","1학년 4반",18,91,144,145,"우수"],
+            ["강다은","1학년 1반",11,144,194,194,"보통"],
+            ["조현우","1학년 3반",131,106,183,176,"보통"],
+            ["윤지원","1학년 5반",111,184,86,16,"우수"],
+            ["장우진","1학년 2반",142,165,147,192,"노력하기"],
+            ["임하은","1학년 4반",79,153,150,132,"보통"],
+            ["한건우","1학년 1반",89,20,200,132,"보통"],
+            ["오소윤","1학년 3반",11,97,16,95,"우수"],
+            ["서준우","1학년 5반",92,50,92,42,"우수"],
+            ["신예진","1학년 2반",48,152,93,176,"보통"],
+            ["권하람","1학년 4반",128,126,169,23,"보통"],
+            ["황지안","1학년 1반",91,80,116,80,"우수"],
+            ["안서진","1학년 3반",125,94,33,119,"우수"],
+            ["송민호","1학년 5반",176,53,116,43,"우수"],
+            ["전유나","1학년 2반",122,123,11,193,"보통"],
+            ["홍성민","1학년 4반",156,60,179,60,"보통"],
+            ["유채윤","1학년 1반",67,106,50,14,"우수"],
+            ["고은서","1학년 3반",22,36,89,34,"매우우수"],
+            ["문지호","1학년 5반",122,43,145,100,"보통"],
+            ["양하영","1학년 2반",159,158,39,144,"보통"],
+            ["손은우","1학년 4반",139,156,153,174,"노력하기"],
+            ["배수아","1학년 1반",81,194,67,148,"보통"],
+            ["백민서","1학년 3반",111,71,146,196,"보통"],
+            ["허준혁","1학년 5반",33,41,174,97,"우수"],
+            ["남지아","1학년 2반",193,25,75,22,"우수"],
+            ["유도윤","1학년 4반",111,172,182,200,"노력하기"],
+            ["박채아","1학년 1반",149,91,124,194,"보통"],
+            ["김우빈","1학년 3반",12,123,144,30,"우수"],
+            ["이서하","1학년 5반",17,111,60,82,"우수"],
+            ["최승우","1학년 2반",111,21,133,72,"우수"],
+            ["정시우","1학년 4반",79,109,193,42,"보통"],
+            ["강지후","1학년 1반",61,103,102,72,"우수"],
+            ["조하린","1학년 3반",27,141,190,168,"보통"],
+            ["윤태윤","1학년 5반",139,80,115,22,"우수"],
+            ["장수민","1학년 2반",182,70,117,107,"보통"],
+            ["임주아","1학년 4반",54,193,136,123,"보통"],
+            ["한태양","1학년 1반",191,108,125,145,"보통"],
+            ["오다인","1학년 3반",31,45,161,47,"우수"],
+            ["서우성","1학년 5반",92,193,79,128,"보통"],
+            ["신리안","1학년 2반",74,130,199,74,"보통"],
+            ["권승민","1학년 4반",133,74,57,131,"우수"],
+            ["황나윤","1학년 1반",192,32,149,146,"보통"],
+            ["안성현","1학년 3반",55,68,171,27,"우수"],
+            ["송지우","1학년 5반",107,117,115,167,"보통"],
+            ["전하준","1학년 2반",156,108,184,59,"보통"],
+            ["홍서준","1학년 4반",30,100,58,175,"우수"],
+            ["유민지","1학년 1반",188,113,172,13,"보통"],
+            ["고지안","1학년 3반",33,162,162,168,"보통"],
+            ["문지유","1학년 5반",33,167,105,160,"보통"],
+            ["양재희","1학년 2반",12,101,103,12,"우수"],
+            ["손가은","1학년 4반",161,174,174,144,"노력하기"],
+            ["배서진","1학년 1반",79,164,135,172,"보통"],
+            ["백민호","1학년 3반",111,184,98,69,"보통"],
+            ["허지후","1학년 5반",34,101,102,193,"보통"],
+            ["남다온","1학년 2반",182,187,97,180,"노력하기"],
+            ["유선우","1학년 4반",19,150,157,62,"우수"],
+            ["박하늘","1학년 1반",65,123,159,168,"보통"],
+            ["김태준","1학년 3반",125,67,72,112,"우수"],
+            ["이수현","1학년 5반",89,178,93,83,"보통"],
+            ["최도건","1학년 2반",97,124,146,170,"보통"],
+            ["정연우","1학년 4반",96,19,19,114,"우수"],
+            ["강민아","1학년 1반",159,177,57,48,"보통"],
+            ["조은준","1학년 3반",169,139,196,60,"보통"],
+            ["윤서하","1학년 5반",109,137,154,28,"보통"],
+            ["장지환","1학년 2반",157,131,89,36,"보통"],
+            ["임수아","1학년 4반",85,135,138,140,"보통"]
+        ];
+
+        let students = rawData.map(row => ({
+            name: row[0],
+            group: row[1],
+            mar: parseInt(row[2]),
+            apr: parseInt(row[3]),
+            may: parseInt(row[4]),
+            jun: parseInt(row[5]),
+            total: parseInt(row[2]) + parseInt(row[3]) + parseInt(row[4]) + parseInt(row[5]),
+            grade: row[6]
+        }));
+
+        // --- Charts Initialization ---
+        let indChart;
+
+        function initDashboard() {
+            // Stats Update
+            document.getElementById('totalStudents').innerText = students.length + '명';
+            const totalSum = students.reduce((acc, s) => acc + s.total, 0);
+            document.getElementById('totalWaste').innerText = totalSum.toLocaleString() + 'g';
+            document.getElementById('avgWaste').innerText = Math.round(totalSum / 4).toLocaleString() + 'g';
+            document.getElementById('needsWork').innerText = students.filter(s => s.grade === '노력하기').length + '명';
+
+            renderMonthlyChart();
+            renderGradeChart();
+            renderIndividualChart();
+            renderTable();
+        }
+
+        function renderMonthlyChart() {
+            const ctx = document.getElementById('monthlyTrendChart').getContext('2d');
+            const monthlySums = {
+                '3월': students.reduce((acc, s) => acc + s.mar, 0),
+                '4월': students.reduce((acc, s) => acc + s.apr, 0),
+                '5월': students.reduce((acc, s) => acc + s.may, 0),
+                '6월': students.reduce((acc, s) => acc + s.jun, 0),
+            };
+
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: Object.keys(monthlySums),
+                    datasets: [{
+                        label: '월별 총 잔반양(g)',
+                        data: Object.values(monthlySums),
+                        borderColor: '#4f46e5',
+                        backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        borderWidth: 3,
+                        pointRadius: 5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+
+        function renderGradeChart() {
+            const ctx = document.getElementById('gradeDistributionChart').getContext('2d');
+            const grades = { '매우우수': 0, '우수': 0, '보통': 0, '노력하기': 0 };
+            students.forEach(s => grades[s.grade]++);
+
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(grades),
+                    datasets: [{
+                        data: Object.values(grades),
+                        backgroundColor: ['#10b981', '#34d399', '#fbbf24', '#f43f5e'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '70%',
+                    plugins: { legend: { position: 'right' } }
+                }
+            });
+        }
+
+        function renderIndividualChart() {
+            const ctx = document.getElementById('individualWasteChart').getContext('2d');
+            const order = document.getElementById('sortOrder').value;
+            
+            const sorted = [...students].sort((a, b) => order === 'desc' ? b.total - a.total : a.total - b.total).slice(0, 15);
+
+            indChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: sorted.map(s => s.name),
+                    datasets: [{
+                        label: '누적 잔반량(g)',
+                        data: sorted.map(s => s.total),
+                        backgroundColor: sorted.map(s => s.total > 500 ? '#f43f5e' : '#4f46e5'),
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
+        }
+
+        function updateIndividualChart() {
+            if (indChart) indChart.destroy();
+            renderIndividualChart();
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('dataTableBody');
+            tbody.innerHTML = students.map(s => `
+                <tr class="bg-white border-b hover:bg-gray-50 transition-colors">
+                    <td class="px-6 py-4 font-semibold text-gray-900">${s.name}</td>
+                    <td class="px-6 py-4">${s.group}</td>
+                    <td class="px-6 py-4 text-center">${s.mar}</td>
+                    <td class="px-6 py-4 text-center">${s.apr}</td>
+                    <td class="px-6 py-4 text-center">${s.may}</td>
+                    <td class="px-6 py-4 text-center">${s.jun}</td>
+                    <td class="px-6 py-4 text-center font-bold text-indigo-600">${s.total}g</td>
+                    <td class="px-6 py-4 text-center">
+                        <span class="px-2 py-1 rounded-full text-xs font-bold ${
+                            s.grade === '매우우수' ? 'bg-emerald-100 text-emerald-700' :
+                            s.grade === '우수' ? 'bg-green-100 text-green-700' :
+                            s.grade === '보통' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'
+                        }">${s.grade}</span>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // 실행
+        window.onload = initDashboard;
+    </script>
+</body>
+</html>
